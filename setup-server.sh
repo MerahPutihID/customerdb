@@ -80,82 +80,68 @@ install_nodejs() {
     mkdir -p ~/.npm-global
     npm config set prefix '~/.npm-global'
     
-    # Add npm global bin to PATH if not already there
-    if ! echo "$PATH" | grep -q "$HOME/.npm-global/bin"; then
-        echo 'export PATH=$HOME/.npm-global/bin:$PATH' >> ~/.bashrc
-        export PATH=$HOME/.npm-global/bin:$PATH
-    fi
-    
-    print_status "Node.js configuration completed"
-}
+#     print_status "Node.js configuration completed"
+# }
 
 # Install PM2
 # install_pm2() {
 #     print_status "Installing PM2..."
-    
-#     # Ensure NVM is loaded for PM2 installation
-#     export NVM_DIR="$HOME/.nvm"
-#     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-    
 #     npm install -g pm2
     
 #     # Setup PM2 logrotate
 #     pm2 install pm2-logrotate
     
-#     # Setup PM2 startup script
-#     pm2 startup
-    
-#     print_status "PM2 installed successfully"
-# }
+    print_status "PM2 installed successfully"
+}
 
 # Install and configure nginx
-# install_nginx() {
-#     print_status "Installing nginx..."
-#     apt install nginx -y
+install_nginx() {
+    print_status "Installing nginx..."
+    apt install nginx -y
     
-#     # Start and enable nginx
-#     systemctl start nginx
-#     systemctl enable nginx
+    # Start and enable nginx
+    systemctl start nginx
+    systemctl enable nginx
     
-#     # Create log directories
-#     mkdir -p /var/log/nginx
+    # Create log directories
+    mkdir -p /var/log/nginx
     
-#     print_status "Nginx installed and started"
-# }
+    print_status "Nginx installed and started"
+}
 
-# Install certbot
+# # Install certbot
 # install_certbot() {
 #     print_status "Installing certbot..."
 #     apt install certbot python3-certbot-nginx -y
     
-#     print_status "Certbot installed"
-# }
+    print_status "Certbot installed"
+}
 
 # Install PostgreSQL
-# install_postgresql() {
-#     print_status "Installing PostgreSQL 15..."
+install_postgresql() {
+    print_status "Installing PostgreSQL 15..."
     
-#     # Install PostgreSQL 15
-#     apt install postgresql-15 postgresql-contrib-15 -y
+    # Install PostgreSQL 15
+    apt install postgresql-15 postgresql-contrib-15 -y
     
-#     # Start and enable PostgreSQL
-#     systemctl start postgresql
-#     systemctl enable postgresql
+    # Start and enable PostgreSQL
+    systemctl start postgresql
+    systemctl enable postgresql
     
-#     # Configure PostgreSQL
-#     sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+    # Configure PostgreSQL
+    sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
     
-#     # Create application database and user
-#     sudo -u postgres createdb custmp_db
-#     sudo -u postgres psql -c "CREATE USER custmp_user WITH PASSWORD 'custmp_password';"
-#     sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE custmp_db TO custmp_user;"
+    # Create application database and user
+    sudo -u postgres createdb custmp_db
+    sudo -u postgres psql -c "CREATE USER custmp_user WITH PASSWORD 'custmp_password';"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE custmp_db TO custmp_user;"
     
-#     print_status "PostgreSQL installed and configured"
-#     print_warning "Database: custmp_db"
-#     print_warning "User: custmp_user"
-#     print_warning "Password: custmp_password"
-#     print_warning "Please change the password in production!"
-# }
+    print_status "PostgreSQL installed and configured"
+    print_warning "Database: custmp_db"
+    print_warning "User: custmp_user"
+    print_warning "Password: custmp_password"
+    print_warning "Please change the password in production!"
+}
 
 # Setup firewall
 setup_firewall() {
@@ -198,8 +184,8 @@ setup_directories() {
     mkdir -p /var/www/customerdb
     
     # Create backup directories
-    # mkdir -p /var/backups/frontend
-    # mkdir -p /var/backups/backend
+    mkdir -p /var/backups/frontend
+    mkdir -p /var/backups/backend
     mkdir -p /var/backups/customerdb
     
     # Create PM2 log directory
@@ -242,47 +228,42 @@ setup_swap() {
 }
 
 # Setup environment
-# setup_environment() {
-#     print_status "Setting up environment..."
+setup_environment() {
+    print_status "Setting up environment..."
     
-#     # Create environment file for production
-#     cat > /etc/environment << EOF
-# # Production environment for customerdb
-# NODE_ENV=production
-# PORT=5000
-# DATABASE_HOST=localhost
-# DATABASE_PORT=5432
-# DATABASE_NAME=custmp_db
-# DATABASE_USERNAME=custmp_user
-# DATABASE_PASSWORD=custmp_password
-# EOF
+    # Create environment file for production
+    cat > /etc/environment << EOF
+# Production environment for customerdb
+NODE_ENV=production
+PORT=5000
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=custmp_db
+DATABASE_USERNAME=custmp_user
+DATABASE_PASSWORD=custmp_password
+EOF
     
-#     # Setup PATH for Node.js via NVM
-#     cat >> ~/.bashrc << 'EOF'
-# # NVM configuration
-# export NVM_DIR="$HOME/.nvm"
-# [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-# [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-# EOF
+#     # Setup PATH for Node.js
+#     echo 'export PATH=/usr/bin:$PATH' >> /etc/profile
     
-#     # Create PM2 ecosystem file
-#     cat > /var/www/customerdb/ecosystem.config.js << 'EOF'
-# module.exports = {
-#   apps: [{
-#     name: 'customerdb-backend',
-#     script: './backend/dist/main.js',
-#     instances: 1,
-#     exec_mode: 'cluster',
-#     env: {
-#       NODE_ENV: 'production',
-#       PORT: 5000
-#     }
-#   }]
-# }
-# EOF
+    # Create PM2 ecosystem file
+    cat > /var/www/customerdb/ecosystem.config.js << 'EOF'
+module.exports = {
+  apps: [{
+    name: 'customerdb-backend',
+    script: './backend/dist/main.js',
+    instances: 1,
+    exec_mode: 'cluster',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 5000
+    }
+  }]
+}
+EOF
     
-#     print_status "Environment configured"
-# }
+    print_status "Environment configured"
+}
 
 # Setup SSL auto-renewal
 setup_ssl_renewal() {
@@ -357,12 +338,12 @@ main() {
     print_status "sudo certbot --nginx -d customer.merahputih-id.com"
     print_status "sudo certbot --nginx -d bc.merahputih-id.com"
     print_status ""
-    # print_status "Database Configuration:"
-    # print_status "Database: custmp_db"
-    # print_status "User: custmp_user"
-    # print_status "Password: custmp_password"
-    # print_status "Host: localhost"
-    # print_status "Port: 5432"
+    print_status "Database Configuration:"
+    print_status "Database: custmp_db"
+    print_status "User: custmp_user"
+    print_status "Password: custmp_password"
+    print_status "Host: localhost"
+    print_status "Port: 5432"
     
     # Show service status
     echo ""
