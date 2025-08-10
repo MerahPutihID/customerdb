@@ -1,0 +1,8 @@
+[submodule "frontend"]
+	path = frontend
+	url = https://github.com/djination/frontend-mp.git
+	branch = account-commision-rate
+[submodule "backend"]
+	path = backend
+	url = https://github.com/bagasargita/be-nest-mp.git
+	branch = account-commision-rate
