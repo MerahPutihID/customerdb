@@ -39,14 +39,25 @@ update_system() {
 
 # Install Node.js
 install_nodejs() {
-    print_status "Installing Node.js 18..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    print_status "Installing Node.js 20 LTS..."
+    
+    # Remove old Node.js if exists
+    apt remove -y nodejs npm || true
+    
+    # Install Node.js 20 LTS
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
     apt-get install -y nodejs
     
     # Verify installation
     node_version=$(node --version)
     npm_version=$(npm --version)
     print_status "Node.js $node_version and npm $npm_version installed"
+    
+    # Set npm to use global directory for current user
+    mkdir -p ~/.npm-global
+    npm config set prefix '~/.npm-global'
+    
+    print_status "Node.js configuration completed"
 }
 
 # Install PM2
@@ -85,17 +96,28 @@ install_certbot() {
 
 # Install PostgreSQL
 install_postgresql() {
-    print_status "Installing PostgreSQL..."
-    apt install postgresql postgresql-contrib -y
+    print_status "Installing PostgreSQL 15..."
+    
+    # Install PostgreSQL 15
+    apt install postgresql-15 postgresql-contrib-15 -y
     
     # Start and enable PostgreSQL
     systemctl start postgresql
     systemctl enable postgresql
     
-    print_status "PostgreSQL installed and started"
-    print_warning "Don't forget to setup database user and database"
-    print_warning "Run: sudo -u postgres createuser --interactive"
-    print_warning "Run: sudo -u postgres createdb merahputih_db"
+    # Configure PostgreSQL
+    sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+    
+    # Create application database and user
+    sudo -u postgres createdb custmp_db
+    sudo -u postgres psql -c "CREATE USER custmp_user WITH PASSWORD 'custmp_password';"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE custmp_db TO custmp_user;"
+    
+    print_status "PostgreSQL installed and configured"
+    print_warning "Database: custmp_db"
+    print_warning "User: custmp_user"
+    print_warning "Password: custmp_password"
+    print_warning "Please change the password in production!"
 }
 
 # Setup firewall
@@ -135,18 +157,31 @@ setup_directories() {
     mkdir -p /var/www/customer.merahputih-id.com
     mkdir -p /var/www/bc.merahputih-id.com
     
+    # Create customerdb project directory
+    mkdir -p /var/www/customerdb
+    
     # Create backup directories
     mkdir -p /var/backups/frontend
     mkdir -p /var/backups/backend
+    mkdir -p /var/backups/customerdb
     
     # Create PM2 log directory
     mkdir -p /var/log/pm2
+    
+    # Create uploads directory for backend
+    mkdir -p /var/www/bc.merahputih-id.com/uploads
+    mkdir -p /var/www/bc.merahputih-id.com/uploads/documents
     
     # Set permissions
     chown -R www-data:www-data /var/www
     chmod -R 755 /var/www
     
+    # Create symlinks for easy access
+    ln -sf /var/www/customerdb /home/customerdb 2>/dev/null || true
+    
     print_status "Directories created"
+    print_status "Project directory: /var/www/customerdb"
+    print_status "Symlink created: /home/customerdb -> /var/www/customerdb"
 }
 
 # Setup swap file (if not exists)
@@ -169,6 +204,44 @@ setup_swap() {
     fi
 }
 
+# Setup environment
+setup_environment() {
+    print_status "Setting up environment..."
+    
+    # Create environment file for production
+    cat > /etc/environment << EOF
+# Production environment for customerdb
+NODE_ENV=production
+PORT=5000
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=custmp_db
+DATABASE_USERNAME=custmp_user
+DATABASE_PASSWORD=custmp_password
+EOF
+    
+    # Setup PATH for Node.js
+    echo 'export PATH=/usr/bin:$PATH' >> /etc/profile
+    
+    # Create PM2 ecosystem file
+    cat > /var/www/customerdb/ecosystem.config.js << 'EOF'
+module.exports = {
+  apps: [{
+    name: 'customerdb-backend',
+    script: './backend/dist/main.js',
+    instances: 1,
+    exec_mode: 'cluster',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 5000
+    }
+  }]
+}
+EOF
+    
+    print_status "Environment configured"
+}
+
 # Setup SSL auto-renewal
 setup_ssl_renewal() {
     print_status "Setting up SSL auto-renewal..."
@@ -178,8 +251,6 @@ setup_ssl_renewal() {
     
     print_status "SSL auto-renewal configured"
 }
-
-# Install additional tools
 install_tools() {
     print_status "Installing additional tools..."
     
@@ -192,11 +263,21 @@ install_tools() {
         unzip \
         tree \
         nano \
-        fail2ban
+        vim \
+        fail2ban \
+        ufw \
+        software-properties-common \
+        apt-transport-https \
+        ca-certificates \
+        gnupg \
+        lsb-release
     
     # Configure fail2ban
     systemctl enable fail2ban
     systemctl start fail2ban
+    
+    # Configure git (optional)
+    git config --global init.defaultBranch main
     
     print_status "Additional tools installed"
 }
@@ -213,6 +294,7 @@ main() {
     install_postgresql
     setup_firewall
     setup_directories
+    setup_environment
     setup_swap
     setup_ssl_renewal
     install_tools
@@ -221,26 +303,46 @@ main() {
     print_status ""
     print_status "Next steps:"
     print_status "1. Setup DNS records for your domains"
-    print_status "2. Configure PostgreSQL database"
-    print_status "3. Deploy your applications"
+    print_status "2. Upload customerdb project to /var/www/"
+    print_status "3. Deploy your applications using deployment scripts"
     print_status "4. Setup SSL certificates"
     print_status ""
-    print_status "Commands to run:"
-    print_status "sudo -u postgres createuser --interactive"
-    print_status "sudo -u postgres createdb merahputih_db"
+    print_status "Commands to run next:"
     print_status "sudo certbot --nginx -d customer.merahputih-id.com"
     print_status "sudo certbot --nginx -d bc.merahputih-id.com"
+    print_status ""
+    print_status "Database Configuration:"
+    print_status "Database: custmp_db"
+    print_status "User: custmp_user"
+    print_status "Password: custmp_password"
+    print_status "Host: localhost"
+    print_status "Port: 5432"
     
     # Show service status
     echo ""
     print_status "Service Status:"
-    systemctl status nginx --no-pager -l
-    systemctl status postgresql --no-pager -l
+    systemctl status nginx --no-pager -l | head -10
+    systemctl status postgresql --no-pager -l | head -10
+    systemctl status fail2ban --no-pager -l | head -5
     
     # Show firewall status
     echo ""
     print_status "Firewall Status:"
     ufw status
+    
+    # Show system info
+    echo ""
+    print_status "System Information:"
+    echo "Node.js: $(node --version)"
+    echo "npm: $(npm --version)"
+    echo "PM2: $(pm2 --version)"
+    echo "nginx: $(nginx -v 2>&1)"
+    echo "PostgreSQL: $(sudo -u postgres psql -c 'SELECT version();' | head -3 | tail -1)"
+    
+    # Show next steps
+    echo ""
+    print_status "🎉 Server setup completed successfully!"
+    print_status "Your server is now ready for customerdb deployment!"
 }
 
 # Run main function
