@@ -287,12 +287,12 @@ main() {
     print_status "Starting server setup..."
     
     update_system
-    install_nodejs
-    install_pm2
-    install_nginx
-    install_certbot
-    install_postgresql
-    setup_firewall
+    #install_nodejs
+    #install_pm2
+    #install_nginx
+    #install_certbot
+    #install_postgresql
+    #setup_firewall
     setup_directories
     setup_environment
     setup_swap
