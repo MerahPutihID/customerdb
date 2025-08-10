@@ -37,36 +37,73 @@ update_system() {
     apt update && apt upgrade -y
 }
 
-# Install Node.js
-# install_nodejs() {
-#     print_status "Installing Node.js 20 LTS..."
+# Install Node.js (or verify NVM installation)
+install_nodejs() {
+    print_status "Checking Node.js installation..."
     
-#     # Remove old Node.js if exists
-#     apt remove -y nodejs npm || true
+    # Check if node is available
+    if command -v node >/dev/null 2>&1; then
+        node_version=$(node --version)
+        npm_version=$(npm --version)
+        print_status "Node.js $node_version and npm $npm_version found"
+        
+        # Check if it's a recent enough version (v16+)
+        major_version=$(node --version | cut -d'.' -f1 | sed 's/v//')
+        if [ "$major_version" -ge 16 ]; then
+            print_status "Node.js version is compatible"
+        else
+            print_warning "Node.js version is older than v16. Consider upgrading with: nvm install --lts"
+        fi
+    else
+        print_warning "Node.js not found. Installing via NVM..."
+        
+        # Install NVM if not exists
+        if [ ! -d "$HOME/.nvm" ]; then
+            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        fi
+        
+        # Load NVM
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        
+        # Install latest LTS Node.js
+        nvm install --lts
+        nvm use --lts
+        nvm alias default lts/*
+        
+        print_status "Node.js installed via NVM"
+    fi
     
-#     # Install Node.js 20 LTS
-#     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-#     apt-get install -y nodejs
+    # Configure npm for global packages
+    mkdir -p ~/.npm-global
+    npm config set prefix '~/.npm-global'
     
-#     # Verify installation
-#     node_version=$(node --version)
-#     npm_version=$(npm --version)
-#     print_status "Node.js $node_version and npm $npm_version installed"
+    # Add npm global bin to PATH if not already there
+    if ! echo "$PATH" | grep -q "$HOME/.npm-global/bin"; then
+        echo 'export PATH=$HOME/.npm-global/bin:$PATH' >> ~/.bashrc
+        export PATH=$HOME/.npm-global/bin:$PATH
+    fi
     
-#     # Set npm to use global directory for current user
-#     mkdir -p ~/.npm-global
-#     npm config set prefix '~/.npm-global'
-    
-#     print_status "Node.js configuration completed"
-# }
+    print_status "Node.js configuration completed"
+}
 
 # Install PM2
 # install_pm2() {
 #     print_status "Installing PM2..."
+    
+#     # Ensure NVM is loaded for PM2 installation
+#     export NVM_DIR="$HOME/.nvm"
+#     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    
 #     npm install -g pm2
     
 #     # Setup PM2 logrotate
 #     pm2 install pm2-logrotate
+    
+#     # Setup PM2 startup script
+#     pm2 startup
     
 #     print_status "PM2 installed successfully"
 # }
@@ -86,7 +123,7 @@ update_system() {
 #     print_status "Nginx installed and started"
 # }
 
-# # Install certbot
+# Install certbot
 # install_certbot() {
 #     print_status "Installing certbot..."
 #     apt install certbot python3-certbot-nginx -y
@@ -121,33 +158,33 @@ update_system() {
 # }
 
 # Setup firewall
-# setup_firewall() {
-#     print_status "Setting up UFW firewall..."
+setup_firewall() {
+    print_status "Setting up UFW firewall..."
     
-#     # Install UFW if not installed
-#     apt install ufw -y
+    # Install UFW if not installed
+    apt install ufw -y
     
-#     # Reset UFW to defaults
-#     ufw --force reset
+    # Reset UFW to defaults
+    ufw --force reset
     
-#     # Set default policies
-#     ufw default deny incoming
-#     ufw default allow outgoing
+    # Set default policies
+    ufw default deny incoming
+    ufw default allow outgoing
     
-#     # Allow SSH
-#     ufw allow ssh
+    # Allow SSH
+    ufw allow ssh
     
-#     # Allow HTTP and HTTPS
-#     ufw allow 'Nginx Full'
+    # Allow HTTP and HTTPS
+    ufw allow 'Nginx Full'
     
-#     # Allow PostgreSQL (from localhost only)
-#     ufw allow from 127.0.0.1 to any port 5432
+    # Allow PostgreSQL (from localhost only)
+    ufw allow from 127.0.0.1 to any port 5432
     
-#     # Enable firewall
-#     ufw --force enable
+    # Enable firewall
+    ufw --force enable
     
-#     print_status "Firewall configured"
-# }
+    print_status "Firewall configured"
+}
 
 # Setup directories
 setup_directories() {
@@ -220,8 +257,13 @@ setup_swap() {
 # DATABASE_PASSWORD=custmp_password
 # EOF
     
-#     # Setup PATH for Node.js
-#     echo 'export PATH=/usr/bin:$PATH' >> /etc/profile
+#     # Setup PATH for Node.js via NVM
+#     cat >> ~/.bashrc << 'EOF'
+# # NVM configuration
+# export NVM_DIR="$HOME/.nvm"
+# [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+# [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+# EOF
     
 #     # Create PM2 ecosystem file
 #     cat > /var/www/customerdb/ecosystem.config.js << 'EOF'
@@ -287,12 +329,12 @@ main() {
     print_status "Starting server setup..."
     
     update_system
-    #install_nodejs
-    #install_pm2
-    #install_nginx
-    #install_certbot
-    #install_postgresql
-    #setup_firewall
+    # install_nodejs
+    # install_pm2
+    # install_nginx
+    # install_certbot
+    # install_postgresql
+    setup_firewall
     setup_directories
     setup_environment
     setup_swap
@@ -301,9 +343,13 @@ main() {
     
     print_status "🎉 Server setup completed!"
     print_status ""
-    print_status "Next steps:"
-    print_status "1. Setup DNS records for your domains"
-    print_status "2. Upload customerdb project to /var/www/"
+    # install_nodejs
+    # install_pm2
+    # install_nginx
+    # install_certbot
+    # install_postgresql
+    # setup_firewall
+    print_status "2. Deploy your project to /var/www/"
     print_status "3. Deploy your applications using deployment scripts"
     print_status "4. Setup SSL certificates"
     print_status ""
