@@ -107,7 +107,7 @@ build_production() {
         ./node_modules/.bin/nest build
     elif [ -f "node_modules/.bin/tsc" ]; then
         print_status "NestJS CLI not found, using TypeScript compiler directly"
-        ./node_modules/.bin/tsc -p tsconfig.build.json
+        npm run build:prod
     else
         print_status "Trying npm script build..."
         npm run build || print_error "Build failed with npm script"
