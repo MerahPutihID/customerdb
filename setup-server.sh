@@ -118,30 +118,52 @@ update_system() {
 # }
 
 # Install PostgreSQL
-# install_postgresql() {
-#     print_status "Installing PostgreSQL 15..."
+install_postgresql() {
+    print_status "Installing PostgreSQL 15..."
     
-#     # Install PostgreSQL 15
-#     apt install postgresql-15 postgresql-contrib-15 -y
+    # Install PostgreSQL 15
+    apt install postgresql-15 postgresql-contrib-15 -y
     
-#     # Start and enable PostgreSQL
-#     systemctl start postgresql
-#     systemctl enable postgresql
+    # Start and enable PostgreSQL
+    systemctl start postgresql
+    systemctl enable postgresql
     
-#     # Configure PostgreSQL
-#     sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+    # Configure PostgreSQL
+    sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
     
-#     # Create application database and user
-#     sudo -u postgres createdb custmp_db
-#     sudo -u postgres psql -c "CREATE USER custmp_user WITH PASSWORD 'custmp_password';"
-#     sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE custmp_db TO custmp_user;"
+    # Read database configuration from backend .env file
+    if [ -f "/var/www/customerdb/backend/.env" ]; then
+        print_status "Reading database configuration from /var/www/customerdb/backend/.env"
+        
+        # Source the .env file to get variables
+        set -a  # automatically export all variables
+        source /var/www/customerdb/backend/.env
+        set +a  # turn off automatic export
+        
+        # Use variables from .env file
+        DB_NAME=${DB_DATABASE:-custmp_db}
+        DB_USER=${DB_USERNAME:-custmp_user}
+        DB_PASS=${DB_PASSWORD:-custmp_password}
+        
+        print_status "Using database config from .env: DB=$DB_NAME, USER=$DB_USER"
+    else
+        print_warning ".env file not found, using default values"
+        DB_NAME="custmp_db"
+        DB_USER="custmp_user"
+        DB_PASS="custmp_password"
+    fi
     
-#     print_status "PostgreSQL installed and configured"
-#     print_warning "Database: custmp_db"
-#     print_warning "User: custmp_user"
-#     print_warning "Password: custmp_password"
-#     print_warning "Please change the password in production!"
-# }
+    # Create application database and user with configuration from .env
+    sudo -u postgres createdb $DB_NAME || print_warning "Database $DB_NAME may already exist"
+    sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';" || print_warning "User $DB_USER may already exist"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;"
+    
+    print_status "PostgreSQL installed and configured"
+    print_warning "Database: $DB_NAME"
+    print_warning "User: $DB_USER"
+    print_warning "Password: $DB_PASS"
+    print_warning "Please change the password in production!"
+}
 
 # Setup firewall
 setup_firewall() {
@@ -228,42 +250,66 @@ setup_swap() {
 }
 
 # Setup environment
-# setup_environment() {
-#     print_status "Setting up environment..."
+setup_environment() {
+    print_status "Setting up environment..."
     
-#     # Create environment file for production
-#     cat > /etc/environment << EOF
-# # Production environment for customerdb
-# NODE_ENV=production
-# PORT=5000
-# DATABASE_HOST=localhost
-# DATABASE_PORT=5432
-# DATABASE_NAME=custmp_db
-# DATABASE_USERNAME=custmp_user
-# DATABASE_PASSWORD=custmp_password
-# EOF
+    # Read database configuration from backend .env file
+    if [ -f "/var/www/customerdb/backend/.env" ]; then
+        print_status "Reading database configuration from /var/www/customerdb/backend/.env"
+        
+        # Source the .env file to get variables
+        set -a  # automatically export all variables
+        source /var/www/customerdb/backend/.env
+        set +a  # turn off automatic export
+        
+        # Use variables from .env file
+        DB_NAME=${DB_DATABASE:-custmp_db}
+        DB_USER=${DB_USERNAME:-custmp_user}
+        DB_PASS=${DB_PASSWORD:-custmp_password}
+        
+        print_status "Database config from .env: DB=$DB_NAME, USER=$DB_USER"
+    else
+        print_warning ".env file not found, using default values"
+        DB_NAME="custmp_db"
+        DB_USER="custmp_user"
+        DB_PASS="custmp_password"
+    fi
     
-# #     # Setup PATH for Node.js
-# #     echo 'export PATH=/usr/bin:$PATH' >> /etc/profile
+    # Create environment file for production
+    cat > /etc/environment << EOF
+# Production environment for customerdb
+NODE_ENV=production
+PORT=5000
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=$DB_NAME
+DATABASE_USERNAME=$DB_USER
+DATABASE_PASSWORD=$DB_PASS
+EOF
     
-#     # Create PM2 ecosystem file
-#     cat > /var/www/customerdb/ecosystem.config.js << 'EOF'
-# module.exports = {
-#   apps: [{
-#     name: 'customerdb-backend',
-#     script: './backend/dist/main.js',
-#     instances: 1,
-#     exec_mode: 'cluster',
-#     env: {
-#       NODE_ENV: 'production',
-#       PORT: 5000
-#     }
-#   }]
-# }
-# EOF
+    # Create PM2 ecosystem file
+    cat > /var/www/customerdb/ecosystem.config.js << EOF
+module.exports = {
+  apps: [{
+    name: 'customerdb-backend',
+    script: './backend/dist/main.js',
+    instances: 1,
+    exec_mode: 'cluster',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 5000,
+      DATABASE_HOST: 'localhost',
+      DATABASE_PORT: 5432,
+      DATABASE_NAME: '$DB_NAME',
+      DATABASE_USERNAME: '$DB_USER',
+      DATABASE_PASSWORD: '$DB_PASS'
+    }
+  }]
+}
+EOF
     
-#     print_status "Environment configured"
-# }
+    print_status "Environment configured with database: $DB_NAME"
+}
 
 # Setup SSL auto-renewal
 setup_ssl_renewal() {
@@ -314,10 +360,10 @@ main() {
     # install_pm2
     # install_nginx
     # install_certbot
-    # install_postgresql
+    install_postgresql
     setup_firewall
     setup_directories
-    # setup_environment
+    setup_environment
     setup_swap
     setup_ssl_renewal
     install_tools
@@ -328,7 +374,7 @@ main() {
     # install_pm2
     # install_nginx
     # install_certbot
-    # install_postgresql
+    install_postgresql
     setup_firewall
     print_status "2. Deploy your project to /var/www/"
     print_status "3. Deploy your applications using deployment scripts"
