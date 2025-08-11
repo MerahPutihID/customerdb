@@ -99,15 +99,16 @@ build_production() {
     # Clear npm cache to avoid issues
     npm cache clean --force
     
-    # Install with verbose output
-    npm ci --verbose
+    # Remove package-lock.json to avoid conflicts
+    rm -f package-lock.json
     
-    # If npm ci fails, try npm install
-    if [ $? -ne 0 ]; then
-        print_warning "npm ci failed, trying npm install..."
-        rm -rf node_modules package-lock.json
-        npm install --verbose
-    fi
+    # Install compatible Vite version first
+    print_status "Installing compatible Vite version first..."
+    npm install vite@5.4.10 @vitejs/plugin-react@4.4.1 --save-dev --force
+    
+    # Then install other dependencies
+    print_status "Installing other dependencies..."
+    npm install --force
     
     # Check if vite is installed
     print_status "Checking Vite installation..."
@@ -154,10 +155,10 @@ build_production() {
         fi
     fi
     
-    # Method 3: Use npx with explicit version
+    # Method 3: Use npx with explicit compatible version
     if [ "$build_success" = false ]; then
-        print_status "Method 3: Using npx with explicit Vite"
-        if npx --yes vite@latest build --mode production; then
+        print_status "Method 3: Using npx with compatible Vite version"
+        if npx --yes vite@5.4.10 build --mode production; then
             build_success=true
         else
             print_warning "Method 3 failed, trying method 4..."

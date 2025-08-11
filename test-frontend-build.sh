@@ -65,7 +65,27 @@ main() {
     npm install
     
     print_status "Checking Vite version..."
-    npm list vite
+    npm list vite --depth=0
+    
+    print_status "Checking if Vite CLI exists..."
+    if [ -f "node_modules/.bin/vite" ]; then
+        print_status "✅ Vite CLI found at: $(ls -la node_modules/.bin/vite)"
+    else
+        print_error "❌ Vite CLI not found in node_modules/.bin/"
+        print_status "Listing node_modules/.bin/ contents:"
+        ls -la node_modules/.bin/ | head -10
+        
+        print_status "Trying to reinstall Vite explicitly..."
+        npm install --force vite@5.4.10 @vitejs/plugin-react@4.4.1
+        
+        print_status "Checking again..."
+        if [ -f "node_modules/.bin/vite" ]; then
+            print_status "✅ Vite CLI found after reinstall"
+        else
+            print_error "❌ Still no Vite CLI found"
+            exit 1
+        fi
+    fi
     
     print_status "Attempting build..."
     if npm run build:prod; then
