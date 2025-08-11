@@ -317,7 +317,7 @@ main() {
     # install_postgresql
     setup_firewall
     setup_directories
-    setup_environment
+    # setup_environment
     setup_swap
     setup_ssl_renewal
     install_tools

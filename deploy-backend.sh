@@ -11,8 +11,8 @@ echo "🚀 Starting Backend Deployment..."
 PROJECT_NAME="merahputih-backend"
 DOMAIN="bc.merahputih-id.com"
 DEPLOY_PATH="/var/www/$DOMAIN"
-NGINX_AVAILABLE="/etc/nginx/sites-available/$DOMAIN"
-NGINX_ENABLED="/etc/nginx/sites-enabled/$DOMAIN"
+NGINX_AVAILABLE="/etc/nginx/sites-available/backend.conf"
+NGINX_ENABLED="/etc/nginx/sites-enabled/backend.conf"
 BACKUP_PATH="/var/backups/backend"
 PM2_CONFIG="pm2.config.json"
 
@@ -40,6 +40,19 @@ if [[ $EUID -eq 0 ]]; then
    exit 1
 fi
 
+# Fix permissions
+fix_permissions() {
+    print_status "Fixing permissions..."
+    
+    # Change ownership of the customerdb directory to current user
+    sudo chown -R $USER:$USER /var/www/customerdb
+    
+    # Set appropriate permissions
+    sudo chmod -R 755 /var/www/customerdb
+    
+    print_status "Permissions fixed"
+}
+
 # Create backup
 create_backup() {
     print_status "Creating backup..."
@@ -57,16 +70,22 @@ build_production() {
     # Navigate to backend submodule
     cd backend
     
-    # Install dependencies
-    npm ci --only=production
+    # Clean previous build
+    rm -rf node_modules dist
     
-    # Build
-    npm run build
+    # Install all dependencies (including dev dependencies for build)
+    npm ci
+    
+    # Build using npx to ensure nest CLI is available
+    npx nest build
     
     if [ ! -d "dist" ]; then
         print_error "Build failed - dist directory not found"
         exit 1
     fi
+    
+    # Now clean dev dependencies for production
+    npm ci --omit=dev
     
     print_status "Backend build completed"
 }
@@ -192,6 +211,7 @@ setup_ssl() {
 main() {
     print_status "Starting backend deployment for $DOMAIN"
     
+    fix_permissions
     create_backup
     build_production
     deploy_files
