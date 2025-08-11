@@ -97,19 +97,26 @@ build_production() {
     # Install all dependencies (including dev dependencies for build)
     npm ci
     
-    # Build using the local nest CLI from node_modules
+    # Debug: Check if NestJS CLI is available
+    print_status "Checking available build tools..."
+    ls -la node_modules/.bin/ | grep -E "(nest|tsc)"
+    
+    # Try multiple build methods
     if [ -f "node_modules/.bin/nest" ]; then
         print_status "Using local NestJS CLI"
         ./node_modules/.bin/nest build
+    elif [ -f "node_modules/.bin/tsc" ]; then
+        print_status "NestJS CLI not found, using TypeScript compiler directly"
+        ./node_modules/.bin/tsc -p tsconfig.build.json
     else
-        print_error "NestJS CLI not found in node_modules"
-        print_status "Trying alternative build method..."
-        # Alternative: use npx with explicit path
-        npx --yes @nestjs/cli build
+        print_status "Trying npm script build..."
+        npm run build || print_error "Build failed with npm script"
     fi
     
     if [ ! -d "dist" ]; then
         print_error "Build failed - dist directory not found"
+        print_status "Available files in current directory:"
+        ls -la
         exit 1
     fi
     
