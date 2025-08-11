@@ -11,8 +11,8 @@ echo "🚀 Starting Frontend Deployment..."
 PROJECT_NAME="merahputih-frontend"
 DOMAIN="customer.merahputih-id.com"
 DEPLOY_PATH="/var/www/$DOMAIN"
-NGINX_AVAILABLE="/etc/nginx/sites-available/frontend.conf"
-NGINX_ENABLED="/etc/nginx/sites-enabled/frontend.conf"
+NGINX_AVAILABLE="/etc/nginx/sites-available/$DOMAIN"
+NGINX_ENABLED="/etc/nginx/sites-enabled/$DOMAIN"
 BACKUP_PATH="/var/backups/frontend"
 
 # Colors

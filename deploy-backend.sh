@@ -11,8 +11,8 @@ echo "🚀 Starting Backend Deployment..."
 PROJECT_NAME="merahputih-backend"
 DOMAIN="bc.merahputih-id.com"
 DEPLOY_PATH="/var/www/$DOMAIN"
-NGINX_AVAILABLE="/etc/nginx/sites-available/backend.conf"
-NGINX_ENABLED="/etc/nginx/sites-enabled/backend.conf"
+NGINX_AVAILABLE="/etc/nginx/sites-available/$DOMAIN"
+NGINX_ENABLED="/etc/nginx/sites-enabled/$DOMAIN"
 BACKUP_PATH="/var/backups/backend"
 PM2_CONFIG="pm2.config.json"
 
@@ -115,6 +115,10 @@ build_production() {
 deploy_files() {
     print_status "Deploying backend files..."
     
+    # Debug: Check what's in dist directory
+    print_status "Contents of dist directory:"
+    ls -la dist/
+    
     # Create deploy directory
     sudo mkdir -p "$DEPLOY_PATH"
     
@@ -136,12 +140,31 @@ deploy_files() {
     sudo chmod -R 755 "$DEPLOY_PATH"
     
     print_status "Backend files deployed to $DEPLOY_PATH"
-    print_status "Main file should be at: $DEPLOY_PATH/main.js"
+    
+    # Debug: Check deployment directory contents
+    print_status "Contents of deployment directory:"
+    ls -la "$DEPLOY_PATH/"
+    
+    # Check specifically for main.js
+    if [ -f "$DEPLOY_PATH/main.js" ]; then
+        print_status "✅ Main file found at: $DEPLOY_PATH/main.js"
+    else
+        print_error "❌ Main file NOT found at: $DEPLOY_PATH/main.js"
+    fi
 }
 
 # Setup PM2
 setup_pm2() {
     print_status "Setting up PM2..."
+    
+    # Debug: Check if main.js exists
+    if [ -f "$DEPLOY_PATH/main.js" ]; then
+        print_status "main.js found at $DEPLOY_PATH/main.js"
+    else
+        print_error "main.js not found at $DEPLOY_PATH/main.js"
+        ls -la "$DEPLOY_PATH/"
+        exit 1
+    fi
     
     # Copy PM2 configuration from root
     if [ -f "../pm2.config.json" ]; then
@@ -153,6 +176,11 @@ setup_pm2() {
         
         # Start with new configuration
         cd "$DEPLOY_PATH"
+        
+        # Debug: Show PM2 config content
+        print_status "PM2 Configuration:"
+        cat pm2.config.json
+        
         pm2 start pm2.config.json
         
         # Save PM2 configuration
