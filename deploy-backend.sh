@@ -118,10 +118,13 @@ deploy_files() {
     # Create deploy directory
     sudo mkdir -p "$DEPLOY_PATH"
     
-    # Copy built files
-    sudo cp -r dist "$DEPLOY_PATH/"
+    # Copy built files - copy contents of dist, not the dist folder itself
+    sudo cp -r dist/* "$DEPLOY_PATH/"
     sudo cp -r node_modules "$DEPLOY_PATH/"
     sudo cp package*.json "$DEPLOY_PATH/"
+    
+    # Note: .env file will be read directly from /var/www/customerdb/backend/.env
+    print_status ".env file will be loaded from: /var/www/customerdb/backend/.env"
     
     # Copy uploads directory if exists
     if [ -d "uploads" ]; then
@@ -133,6 +136,7 @@ deploy_files() {
     sudo chmod -R 755 "$DEPLOY_PATH"
     
     print_status "Backend files deployed to $DEPLOY_PATH"
+    print_status "Main file should be at: $DEPLOY_PATH/main.js"
 }
 
 # Setup PM2
