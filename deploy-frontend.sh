@@ -61,8 +61,8 @@ setup_node_env() {
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
     [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
     
-    # Use Node.js 18 for frontend
-    nvm use 18
+    # Use Node.js 20 for frontend
+    nvm use 20
     
     # Verify version
     node_version=$(node --version)
