@@ -97,8 +97,8 @@ build_production() {
     # Install all dependencies (including dev dependencies for build)
     npm ci
     
-    # Build using npx to ensure nest CLI is available
-    npx nest build
+    # Build using npm script instead of npx
+    npm run build
     
     if [ ! -d "dist" ]; then
         print_error "Build failed - dist directory not found"
