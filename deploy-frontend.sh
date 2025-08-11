@@ -93,26 +93,81 @@ build_production() {
     # Clean previous build
     rm -rf node_modules dist
     
-    # Install dependencies
-    npm ci
+    # Install dependencies with debugging
+    print_status "Installing dependencies..."
+    npm ci --verbose
     
-    # Build using the local vite CLI from node_modules
+    # Check if vite is installed
+    print_status "Checking Vite installation..."
     if [ -f "node_modules/.bin/vite" ]; then
-        print_status "Using local Vite CLI"
-        ./node_modules/.bin/vite build --mode production
+        print_status "Vite CLI found in node_modules"
+        ls -la node_modules/.bin/vite
     else
-        print_error "Vite CLI not found in node_modules"
-        print_status "Trying alternative build method..."
-        # Alternative: use npx with explicit package
-        npx --yes vite build --mode production
+        print_warning "Vite CLI not found, installing manually..."
+        npm install vite@latest --save-dev
     fi
     
-    if [ ! -d "dist" ]; then
-        print_error "Build failed - dist directory not found"
+    # Verify package.json and node_modules
+    print_status "Verifying installation..."
+    npm list vite || true
+    
+    # Try multiple build methods
+    build_success=false
+    
+    # Method 1: Use local Vite CLI
+    if [ -f "node_modules/.bin/vite" ]; then
+        print_status "Method 1: Using local Vite CLI"
+        if ./node_modules/.bin/vite build --mode production; then
+            build_success=true
+        else
+            print_warning "Method 1 failed, trying method 2..."
+        fi
+    fi
+    
+    # Method 2: Use npm script
+    if [ "$build_success" = false ]; then
+        print_status "Method 2: Using npm run build:prod"
+        if npm run build:prod; then
+            build_success=true
+        else
+            print_warning "Method 2 failed, trying method 3..."
+        fi
+    fi
+    
+    # Method 3: Use npx with explicit version
+    if [ "$build_success" = false ]; then
+        print_status "Method 3: Using npx with explicit Vite"
+        if npx --yes vite@latest build --mode production; then
+            build_success=true
+        else
+            print_warning "Method 3 failed, trying method 4..."
+        fi
+    fi
+    
+    # Method 4: Reinstall and try again
+    if [ "$build_success" = false ]; then
+        print_status "Method 4: Clean reinstall and build"
+        rm -rf node_modules package-lock.json
+        npm install
+        if npm run build:prod; then
+            build_success=true
+        fi
+    fi
+    
+    # Check if build succeeded
+    if [ "$build_success" = false ] || [ ! -d "dist" ]; then
+        print_error "All build methods failed - dist directory not found"
+        print_status "Debugging information:"
+        echo "Current directory: $(pwd)"
+        echo "Node version: $(node --version)"
+        echo "NPM version: $(npm --version)"
+        echo "Package.json exists: $([ -f package.json ] && echo 'Yes' || echo 'No')"
+        echo "Vite in devDependencies:"
+        cat package.json | grep -A 5 -B 5 '"vite"'
         exit 1
     fi
     
-    print_status "Frontend build completed"
+    print_status "Frontend build completed successfully"
 }
 
 # Deploy files

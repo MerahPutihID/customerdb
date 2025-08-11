@@ -201,8 +201,10 @@ setup_pm2() {
         # Save PM2 configuration
         pm2 save
         
-        # Setup PM2 startup
-        pm2 startup || true
+        # Setup PM2 startup (copy the command from output above)
+        print_status "Setting up PM2 startup script..."
+        print_warning "Please run this command manually to setup PM2 startup:"
+        print_warning "sudo env PATH=\$PATH:/home/merahputihtech/.nvm/versions/node/v20.19.2/bin /home/merahputihtech/.nvm/versions/node/v20.19.2/lib/node_modules/pm2/bin/pm2 startup systemd -u merahputihtech --hp /home/merahputihtech"
         
         print_status "PM2 setup completed"
     else
@@ -254,13 +256,24 @@ setup_database() {
 restart_services() {
     print_status "Restarting services..."
     
-    # Restart PM2 processes
-    pm2 restart $PROJECT_NAME
-    print_status "PM2 processes restarted"
+    # Check if PM2 process exists before restarting
+    if pm2 list | grep -q "$PROJECT_NAME"; then
+        print_status "Restarting existing PM2 process..."
+        pm2 restart $PROJECT_NAME --update-env
+    else
+        print_status "PM2 process not found, process should already be running..."
+    fi
     
-    # Reload nginx
-    sudo systemctl reload nginx
-    print_status "Nginx reloaded"
+    # Check PM2 status
+    pm2 status
+    
+    # Reload nginx if it's running
+    if systemctl is-active --quiet nginx; then
+        sudo systemctl reload nginx
+        print_status "Nginx reloaded"
+    else
+        print_warning "Nginx is not running"
+    fi
 }
 
 # Setup SSL if not exists
