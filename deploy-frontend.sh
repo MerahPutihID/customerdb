@@ -102,12 +102,8 @@ build_production() {
     # Remove package-lock.json to avoid conflicts
     rm -f package-lock.json
     
-    # Install compatible Vite version first
-    print_status "Installing compatible Vite version first..."
-    npm install vite@5.4.10 @vitejs/plugin-react@4.4.1 --save-dev --force
-    
-    # Then install other dependencies
-    print_status "Installing other dependencies..."
+    # Install all dependencies (skip the vite-specific install since npx works)
+    print_status "Installing dependencies..."
     npm install --force
     
     # Check if vite is installed
@@ -135,30 +131,29 @@ build_production() {
     # Try multiple build methods
     build_success=false
     
-    # Method 1: Use local Vite CLI
-    if [ -f "node_modules/.bin/vite" ]; then
-        print_status "Method 1: Using local Vite CLI"
-        if ./node_modules/.bin/vite build --mode production; then
-            build_success=true
-        else
-            print_warning "Method 1 failed, trying method 2..."
-        fi
+    # Method 1: Use npx with compatible Vite version (most reliable)
+    print_status "Method 1: Using npx vite@5.4.10 (Node.js 18 compatible)"
+    if npx --yes vite@5.4.10 build --mode production; then
+        build_success=true
+        print_status "✅ Build successful with npx!"
+    else
+        print_warning "Method 1 failed, trying method 2..."
     fi
     
-    # Method 2: Use npm script
-    if [ "$build_success" = false ]; then
-        print_status "Method 2: Using npm run build:prod"
-        if npm run build:prod; then
+    # Method 2: Use local Vite CLI if available
+    if [ "$build_success" = false ] && [ -f "node_modules/.bin/vite" ]; then
+        print_status "Method 2: Using local Vite CLI"
+        if ./node_modules/.bin/vite build --mode production; then
             build_success=true
         else
             print_warning "Method 2 failed, trying method 3..."
         fi
     fi
     
-    # Method 3: Use npx with explicit compatible version
+    # Method 3: Use npm script
     if [ "$build_success" = false ]; then
-        print_status "Method 3: Using npx with compatible Vite version"
-        if npx --yes vite@5.4.10 build --mode production; then
+        print_status "Method 3: Using npm run build:prod"
+        if npm run build:prod; then
             build_success=true
         else
             print_warning "Method 3 failed, trying method 4..."
@@ -167,27 +162,52 @@ build_production() {
     
     # Method 4: Force reinstall with compatible Vite version
     if [ "$build_success" = false ]; then
-        print_status "Method 4: Force reinstall with compatible Vite version"
-        rm -rf node_modules package-lock.json
+        print_status "Method 4: Using minimal vite config"
         
-        # Install compatible Vite version first
-        npm install vite@^5.4.10 @vitejs/plugin-react@^4.4.1 --save-dev
-        
-        # Then install other dependencies
-        npm install
-        
-        if npm run build:prod; then
+        # Try with minimal config that doesn't require local vite imports
+        if npx --yes vite@5.4.10 build --config vite.config.minimal.js --mode production; then
             build_success=true
+        else
+            print_warning "Method 4 failed, trying method 5..."
         fi
     fi
     
-    # Method 5: Use legacy build with webpack fallback
+    # Method 5: Build without any config file
     if [ "$build_success" = false ]; then
-        print_status "Method 5: Trying alternative build approach"
+        print_status "Method 5: Build without config file"
         
-        # Try using npx with specific compatible version
+        # Temporarily rename the problematic config
+        if [ -f "vite.config.js" ]; then
+            mv vite.config.js vite.config.js.backup
+        fi
+        
+        # Ensure index.html exists in frontend directory
+        if [ ! -f "index.html" ]; then
+            print_status "Creating index.html..."
+            cat > index.html << 'EOF'
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Merah Putih Frontend</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+EOF
+        fi
+        
         if npx --yes vite@5.4.10 build --mode production; then
             build_success=true
+        fi
+        
+        # Restore the config file
+        if [ -f "vite.config.js.backup" ]; then
+            mv vite.config.js.backup vite.config.js
         fi
     fi
     
