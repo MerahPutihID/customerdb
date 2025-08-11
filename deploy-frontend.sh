@@ -39,6 +39,37 @@ if [[ $EUID -eq 0 ]]; then
    exit 1
 fi
 
+# Fix permissions
+fix_permissions() {
+    print_status "Fixing permissions..."
+    
+    # Change ownership of the customerdb directory to current user
+    sudo chown -R $USER:$USER /var/www/customerdb
+    
+    # Set appropriate permissions
+    sudo chmod -R 755 /var/www/customerdb
+    
+    print_status "Permissions fixed"
+}
+
+# Setup Node.js environment for frontend
+setup_node_env() {
+    print_status "Setting up Node.js 18 environment for frontend..."
+    
+    # Load NVM
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    
+    # Use Node.js 18 for frontend
+    nvm use 18
+    
+    # Verify version
+    node_version=$(node --version)
+    npm_version=$(npm --version)
+    print_status "Using Node.js $node_version and npm $npm_version for frontend"
+}
+
 # Create backup
 create_backup() {
     print_status "Creating backup..."
@@ -53,8 +84,14 @@ create_backup() {
 build_production() {
     print_status "Building frontend..."
     
+    # Setup Node.js 18 environment
+    setup_node_env
+    
     # Navigate to frontend submodule
     cd frontend
+    
+    # Clean previous build
+    rm -rf node_modules dist
     
     # Install dependencies
     npm ci
@@ -139,6 +176,7 @@ setup_ssl() {
 main() {
     print_status "Starting deployment for $DOMAIN"
     
+    fix_permissions
     create_backup
     build_production
     deploy_files

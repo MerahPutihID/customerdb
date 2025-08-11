@@ -53,6 +53,24 @@ fix_permissions() {
     print_status "Permissions fixed"
 }
 
+# Setup Node.js environment for backend
+setup_node_env() {
+    print_status "Setting up Node.js 20 environment for backend..."
+    
+    # Load NVM
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    
+    # Use Node.js 20 for backend
+    nvm use 20
+    
+    # Verify version
+    node_version=$(node --version)
+    npm_version=$(npm --version)
+    print_status "Using Node.js $node_version and npm $npm_version for backend"
+}
+
 # Create backup
 create_backup() {
     print_status "Creating backup..."
@@ -66,6 +84,9 @@ create_backup() {
 # Build production
 build_production() {
     print_status "Building backend..."
+    
+    # Setup Node.js 20 environment
+    setup_node_env
     
     # Navigate to backend submodule
     cd backend
