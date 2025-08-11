@@ -61,8 +61,8 @@ setup_node_env() {
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
     [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
     
-    # Use Node.js 20 for frontend
-    nvm use 20
+    # Use Node.js 18 for frontend
+    nvm use 18
     
     # Verify version
     node_version=$(node --version)
@@ -95,7 +95,19 @@ build_production() {
     
     # Install dependencies with debugging
     print_status "Installing dependencies..."
+    
+    # Clear npm cache to avoid issues
+    npm cache clean --force
+    
+    # Install with verbose output
     npm ci --verbose
+    
+    # If npm ci fails, try npm install
+    if [ $? -ne 0 ]; then
+        print_warning "npm ci failed, trying npm install..."
+        rm -rf node_modules package-lock.json
+        npm install --verbose
+    fi
     
     # Check if vite is installed
     print_status "Checking Vite installation..."
@@ -103,8 +115,16 @@ build_production() {
         print_status "Vite CLI found in node_modules"
         ls -la node_modules/.bin/vite
     else
-        print_warning "Vite CLI not found, installing manually..."
-        npm install vite@latest --save-dev
+        print_warning "Vite CLI not found, installing compatible version for Node.js 18..."
+        # Install Vite 5.x which supports Node.js 18
+        npm install vite@^5.4.10 @vitejs/plugin-react@^4.4.1 --save-dev
+    fi
+    
+    # Also check if current vite version is compatible
+    vite_version=$(npm list vite --depth=0 2>/dev/null | grep vite | head -1 | cut -d@ -f2 || echo "")
+    if [[ "$vite_version" =~ ^7\. ]] || [[ "$vite_version" =~ ^6\. ]]; then
+        print_warning "Vite version $vite_version requires Node.js 20+, downgrading to compatible version..."
+        npm install vite@^5.4.10 @vitejs/plugin-react@^4.4.1 --save-dev
     fi
     
     # Verify package.json and node_modules
@@ -144,12 +164,28 @@ build_production() {
         fi
     fi
     
-    # Method 4: Reinstall and try again
+    # Method 4: Force reinstall with compatible Vite version
     if [ "$build_success" = false ]; then
-        print_status "Method 4: Clean reinstall and build"
+        print_status "Method 4: Force reinstall with compatible Vite version"
         rm -rf node_modules package-lock.json
+        
+        # Install compatible Vite version first
+        npm install vite@^5.4.10 @vitejs/plugin-react@^4.4.1 --save-dev
+        
+        # Then install other dependencies
         npm install
+        
         if npm run build:prod; then
+            build_success=true
+        fi
+    fi
+    
+    # Method 5: Use legacy build with webpack fallback
+    if [ "$build_success" = false ]; then
+        print_status "Method 5: Trying alternative build approach"
+        
+        # Try using npx with specific compatible version
+        if npx --yes vite@5.4.10 build --mode production; then
             build_success=true
         fi
     fi
