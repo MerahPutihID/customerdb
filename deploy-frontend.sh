@@ -96,8 +96,16 @@ build_production() {
     # Install dependencies
     npm ci
     
-    # Build production
-    npm run build:prod
+    # Build using the local vite CLI from node_modules
+    if [ -f "node_modules/.bin/vite" ]; then
+        print_status "Using local Vite CLI"
+        ./node_modules/.bin/vite build --mode production
+    else
+        print_error "Vite CLI not found in node_modules"
+        print_status "Trying alternative build method..."
+        # Alternative: use npx with explicit package
+        npx --yes vite build --mode production
+    fi
     
     if [ ! -d "dist" ]; then
         print_error "Build failed - dist directory not found"

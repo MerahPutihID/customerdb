@@ -97,8 +97,16 @@ build_production() {
     # Install all dependencies (including dev dependencies for build)
     npm ci
     
-    # Build using npm script instead of npx
-    npm run build
+    # Build using the local nest CLI from node_modules
+    if [ -f "node_modules/.bin/nest" ]; then
+        print_status "Using local NestJS CLI"
+        ./node_modules/.bin/nest build
+    else
+        print_error "NestJS CLI not found in node_modules"
+        print_status "Trying alternative build method..."
+        # Alternative: use npx with explicit path
+        npx --yes @nestjs/cli build
+    fi
     
     if [ ! -d "dist" ]; then
         print_error "Build failed - dist directory not found"
